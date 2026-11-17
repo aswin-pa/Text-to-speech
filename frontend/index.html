@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text to Speech Studio</title>
+  <style>
+    :root {
+      --bg-1: #0f172a;
+      --bg-2: #1e1b4b;
+      --card: rgba(255, 255, 255, 0.07);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent-1: #6366f1;
+      --accent-2: #06b6d4;
+      --danger: #f87171;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* Floating background blobs */
+    body::before, body::after {
+      content: "";
+      position: fixed;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.35;
+      z-index: -1;
+      animation: float 14s ease-in-out infinite alternate;
+    }
+    body::before { background: var(--accent-1); top: -120px; left: -120px; }
+    body::after  { background: var(--accent-2); bottom: -140px; right: -120px; animation-delay: -6s; }
+
+    @keyframes float {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(60px, 40px) scale(1.15); }
+    }
+
+    .card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 36px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+      animation: rise 0.6s ease-out both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    header { text-align: center; margin-bottom: 28px; }
+
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #a5b4fc, #67e8f9);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    header p { margin: 8px 0 0; color: var(--muted); font-size: 0.95rem; }
+
+    /* Text area */
+    .field { position: relative; }
+
+    textarea {
+      width: 100%;
+      min-height: 190px;
+      resize: vertical;
+      padding: 18px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text);
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+
+    textarea::placeholder { color: #64748b; }
+
+    textarea:focus {
+      border-color: var(--accent-1);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+    }
+
+    .counter {
+      position: absolute;
+      right: 14px;
+      bottom: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    select {
+      padding: 12px 14px;
+      font-size: 15px;
+      color: var(--text);
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    select option { background: #1e1b4b; }
+
+    .btn {
+      position: relative;
+      flex: 1;
+      min-width: 180px;
+      padding: 13px 22px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+      box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(99, 102, 241, 0.45);
+    }
+
+    .btn:active:not(:disabled) { transform: translateY(0); }
+
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn .spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      vertical-align: -3px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .btn.loading .spinner { display: inline-block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Waveform animation */
+    .wave {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 56px;
+      margin-top: 22px;
+    }
+
+    .wave.active { display: flex; animation: fadeIn 0.3s ease; }
+
+    .wave span {
+      width: 6px;
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(to top, var(--accent-1), var(--accent-2));
+      animation: bar 1s ease-in-out infinite;
+    }
+
+    .wave span:nth-child(2) { animation-delay: 0.1s; }
+    .wave span:nth-child(3) { animation-delay: 0.2s; }
+    .wave span:nth-child(4) { animation-delay: 0.3s; }
+    .wave span:nth-child(5) { animation-delay: 0.4s; }
+    .wave span:nth-child(6) { animation-delay: 0.5s; }
+    .wave span:nth-child(7) { animation-delay: 0.6s; }
+
+    @keyframes bar {
+      0%, 100% { transform: scaleY(0.25); }
+      50%      { transform: scaleY(1); }
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Messages */
+    .message {
+      min-height: 22px;
+      margin-top: 14px;
+      font-size: 14px;
+      text-align: center;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+
+    .message.error { color: var(--danger); }
+    .message.success { color: #4ade80; }
+
+    /* Result panel */
+    .result {
+      display: none;
+      margin-top: 18px;
+      padding: 20px;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      animation: rise 0.5s ease-out both;
+    }
+
+    .result.show { display: block; }
+
+    audio {
+      width: 100%;
+      border-radius: 10px;
+      color-scheme: dark;
+    }
+
+    .download {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-2);
+      text-decoration: none;
+      border: 1px solid rgba(6, 182, 212, 0.5);
+      border-radius: 10px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .download:hover { background: rgba(6, 182, 212, 0.15); color: #67e8f9; }
+
+    @media (max-width: 520px) {
+      .card { padding: 24px; }
+      h1 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header>
+      <h1>Text to Speech Studio</h1>
+      <p>Turn any text into natural-sounding speech</p>
+    </header>
+
+    <div class="field">
+      <textarea id="text" placeholder="Type or paste your text here..."></textarea>
+      <span class="counter" id="counter">0 / 3000</span>
+    </div>
+
+    <div class="controls">
+      <select id="format" aria-label="Audio format">
+        <option value="mp3">MP3</option>
+        <option value="wav">WAV</option>
+      </select>
+      <button id="speakBtn" class="btn">
+        <span class="spinner"></span>
+        <span class="label">Generate speech</span>
+      </button>
+    </div>
+
+    <div class="wave" id="wave">
+      <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+
+    <p class="message" id="message"></p>
+
+    <section class="result" id="result">
+      <audio id="player" controls></audio>
+      <br>
+      <a id="download" class="download" hidden>Download audio</a>
+    </section>
+  </main>
+
+  <script>
+    const API_URL = "http://127.0.0.1:8000/synthesize";
+    const MAX_CHARS = 3000;
+
+    const btn = document.getElementById("speakBtn");
+    const btnLabel = btn.querySelector(".label");
+    const textBox = document.getElementById("text");
+    const counter = document.getElementById("counter");
+    const formatSel = document.getElementById("format");
+    const wave = document.getElementById("wave");
+    const message = document.getElementById("message");
+    const result = document.getElementById("result");
+    const player = document.getElementById("player");
+    const downloadLink = document.getElementById("download");
+
+    let currentUrl = null;
+
+    function setMessage(text, type = "") {
+      message.textContent = text;
+      message.className = "message " + type;
+    }
+
+    function setLoading(isLoading) {
+      btn.disabled = isLoading;
+      btn.classList.toggle("loading", isLoading);
+      btnLabel.textContent = isLoading ? "Generating..." : "Generate speech";
+      wave.classList.toggle("active", isLoading);
+    }
+
+    textBox.addEventListener("input", () => {
+      const length = textBox.value.length;
+      counter.textContent = `${length} / ${MAX_CHARS}`;
+      counter.style.color = length > MAX_CHARS ? "#f87171" : "";
+    });
+
+    btn.addEventListener("click", async () => {
+      const text = textBox.value.trim();
+      setMessage("");
+
+      if (!text) {
+        setMessage("Please enter some text.", "error");
+        textBox.focus();
+        return;
+      }
+      if (text.length > MAX_CHARS) {
+        setMessage(`Text is too long. Keep it under ${MAX_CHARS} characters.`, "error");
+        return;
+      }
+
+      setLoading(true);
+      result.classList.remove("show");
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, format: formatSel.value }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Request failed");
+        }
+
+        const blob = await res.blob();
+
+        // Free the previous audio URL to avoid memory build-up
+        if (currentUrl) URL.revokeObjectURL(currentUrl);
+        currentUrl = URL.createObjectURL(blob);
+
+        player.src = currentUrl;
+        downloadLink.href = currentUrl;
+        downloadLink.download = `speech.${formatSel.value}`;
+        downloadLink.hidden = false;
+
+        result.classList.add("show");
+        player.play().catch(() => {}); // browsers may block autoplay; that's fine
+        setMessage("Your audio is ready.", "success");
+      } catch (e) {
+        setMessage(e.message, "error");
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>
